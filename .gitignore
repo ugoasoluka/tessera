@@ -17,3 +17,7 @@ venv/
 # IDE
 .vscode/
 .idea/
+# Helm
+helm/**/charts/
+helm/**/*.tgz
+helm/**/Chart.lock

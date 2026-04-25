@@ -1,0 +1,10 @@
+apiVersion: v2
+name: tessera-external-secrets
+description: External Secrets Operator for the Tessera coding agent platform
+type: application
+version: 1.0.0
+appVersion: 0.18.0
+dependencies:
+  - name: external-secrets
+    version: 0.18.0
+    repository: https://charts.external-secrets.io
