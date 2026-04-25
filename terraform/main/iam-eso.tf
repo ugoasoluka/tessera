@@ -8,9 +8,10 @@ data "aws_iam_policy_document" "eso_secrets_access" {
       "secretsmanager:DescribeSecret",
     ]
 
-    resources = [
-      for s in aws_secretsmanager_secret.app_secrets : s.arn
-    ]
+    resources = concat(
+      [for s in aws_secretsmanager_secret.app_secrets : s.arn],
+      [module.rds_temporal.master_user_secret_arn],
+    )
   }
 }
 
@@ -24,7 +25,8 @@ module "eso_irsa" {
   oidc_provider_arn = module.eks_oidc_provider.oidc_provider_arn
   oidc_provider_url = module.eks_oidc_provider.oidc_provider_url
 
-  inline_policy_json = data.aws_iam_policy_document.eso_secrets_access.json
+  create_inline_policy = true
+  inline_policy_json   = data.aws_iam_policy_document.eso_secrets_access.json
 
   tags = local.tags
 }

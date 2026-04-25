@@ -1,9 +1,10 @@
 locals {
   processed_addons = {
     for key, addon in var.eks_add_ons : key => {
-      version              = lookup(addon, "version", null)
-      resolve_conflicts    = lookup(addon, "resolve_conflicts_on_update", lookup(addon, "resolve_conflicts", null))
-      configuration_values = lookup(addon, "configuration_values", null)
+      version                  = lookup(addon, "version", null)
+      resolve_conflicts        = lookup(addon, "resolve_conflicts_on_update", lookup(addon, "resolve_conflicts", null))
+      service_account_role_arn = lookup(addon, "service_account_role_arn", null)
+      configuration_values     = lookup(addon, "configuration_values", null)
     }
   }
 }
@@ -94,6 +95,7 @@ resource "aws_eks_addon" "add_ons" {
   addon_name                  = each.key
   addon_version               = each.value.version
   resolve_conflicts_on_update = each.value.resolve_conflicts
+  service_account_role_arn    = each.value.service_account_role_arn
   configuration_values        = each.value.configuration_values
 
   depends_on = [aws_eks_node_group.ng]

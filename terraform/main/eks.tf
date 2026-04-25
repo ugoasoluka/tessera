@@ -25,6 +25,9 @@ module "eks" {
     "vpc-cni"    = {}
     "kube-proxy" = {}
     "coredns"    = {}
+    "aws-ebs-csi-driver" = {
+      service_account_role_arn = module.ebs_csi_irsa.role_arn
+    }
   }
 
   tags = local.tags

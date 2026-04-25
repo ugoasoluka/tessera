@@ -30,9 +30,18 @@ variable "managed_policy_arns" {
 }
 
 variable "inline_policy_json" {
-  description = "Optional JSON-encoded inline policy document"
+  description = "JSON-encoded inline policy document. Only used when create_inline_policy = true."
   type        = string
   default     = null
+}
+
+# Separate static toggle so `count` stays known at plan time even when
+# inline_policy_json is computed from resource attributes (e.g. ARNs that
+# don't exist until apply).
+variable "create_inline_policy" {
+  description = "Whether to create and attach the inline policy. Set to true when passing inline_policy_json."
+  type        = bool
+  default     = false
 }
 
 variable "tags" {

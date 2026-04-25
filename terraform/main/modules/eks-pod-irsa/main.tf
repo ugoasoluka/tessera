@@ -36,14 +36,14 @@ resource "aws_iam_role_policy_attachment" "managed" {
 }
 
 resource "aws_iam_policy" "inline" {
-  count       = var.inline_policy_json != null ? 1 : 0
+  count       = var.create_inline_policy ? 1 : 0
   name        = "${var.name}-policy"
   description = "Inline policy for ${var.name}"
   policy      = var.inline_policy_json
 }
 
 resource "aws_iam_role_policy_attachment" "inline" {
-  count      = var.inline_policy_json != null ? 1 : 0
+  count      = var.create_inline_policy ? 1 : 0
   role       = aws_iam_role.this.name
   policy_arn = aws_iam_policy.inline[0].arn
 }
