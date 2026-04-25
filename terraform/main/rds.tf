@@ -3,8 +3,8 @@ module "rds_temporal" {
 
   name           = "tessera-temporal"
   vpc_id         = module.vpc.id
-  subnet_ids     = values(module.vpc.private_subnet_ids)
-  engine_version = "16.4"
+  subnet_ids     = values(module.vpc.data_subnet_ids)
+  engine_version = "16.13"
   instance_class = "db.t4g.micro"
 
   allowed_security_group_ids = [

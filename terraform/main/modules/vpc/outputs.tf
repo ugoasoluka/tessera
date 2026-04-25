@@ -32,3 +32,13 @@ output "nat_gateway_public_ips" {
   value       = { for k, v in aws_nat_gateway.nat_gw : k => v.public_ip }
   description = "NAT Gateway public IPs by AZ"
 }
+
+output "data_subnet_ids" {
+  value       = { for k, v in aws_subnet.data : k => v.id }
+  description = "Data subnet IDs by AZ"
+}
+
+output "data_subnet_cidrs" {
+  value       = { for k, v in aws_subnet.data : k => v.cidr_block }
+  description = "Data subnet CIDRs by AZ"
+}
