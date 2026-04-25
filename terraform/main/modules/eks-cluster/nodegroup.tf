@@ -13,6 +13,8 @@ resource "aws_launch_template" "ng" {
   for_each    = var.node_groups
   name_prefix = "${var.cluster_name}-${each.key}-"
 
+  vpc_security_group_ids = [aws_security_group.eks_worker.id]
+
   block_device_mappings {
     device_name = "/dev/xvda"
     ebs {
