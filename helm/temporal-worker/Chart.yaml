@@ -3,4 +3,4 @@ name: tessera-temporal-worker
 description: Tessera coding agent Temporal worker
 type: application
 version: 0.1.0
-appVersion: "v26.4.26.539"
+appVersion: "v26.4.26.554"
