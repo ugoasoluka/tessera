@@ -1,0 +1,37 @@
+# EditorConfig helps maintain consistent coding styles for multiple developers
+# working on the same project across various editors and IDEs.
+# https://editorconfig.org
+
+root = true
+
+# Default settings for all files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# YAML files (2-space indent)
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
+# JSON files (2-space indent)
+[*.json]
+indent_style = space
+indent_size = 2
+
+# Terraform files (2-space indent)
+[*.{tf,tfvars}]
+indent_style = space
+indent_size = 2
+
+# Markdown files (2-space indent)
+[*.md]
+indent_style = space
+indent_size = 2
+
+# Python files (4-space indent)
+[*.py]
+indent_style = space
+indent_size = 4
