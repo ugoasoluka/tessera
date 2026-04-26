@@ -72,7 +72,7 @@ flowchart LR
 - AWS account + an AWS profile with admin (or close to it) for the initial provision. Region is `us-east-2`.
 - A free Slack workspace and a Slack app with **Socket Mode enabled**, scopes `app_mentions:read`, `chat:write`, `channels:history`, plus an app-level token (`xapp-…`). The bot token is `xoxb-…`.
 - A GitHub repo the agent can PR into, plus a fine-grained PAT with `Contents: Read & Write` and `Pull requests: Read & Write` on that repo.
-- A Google AI Studio API key for `gemini-2.0-flash`.
+- An Anthropic API key (paid tier — free-tier-equivalent doesn't exist on Anthropic, ~$5–10 of credits is plenty for the demo). The default model is `claude-haiku-4-5-20251001`; configurable via `helm/temporal-worker/values.yaml`.
 - Local tools: `terraform >= 1.5`, `kubectl`, `helm >= 3.13`, `aws` CLI v2, `docker` (only if you want to build images locally — CI does this for you).
 
 ---
@@ -139,14 +139,12 @@ Terraform created the secrets with `PLACEHOLDER_REPLACE_ME`. Fill them in:
 for kv in \
   "tessera/slack-bot-token=xoxb-..." \
   "tessera/slack-app-token=xapp-..." \
-  "tessera/anthropic-api-key=<your-gemini-or-llm-api-key>" \
+  "tessera/anthropic-api-key=sk-ant-api03-..." \
   "tessera/github-pat=github_pat_..."; do
   name="${kv%%=*}"; value="${kv#*=}"
   aws secretsmanager put-secret-value --secret-id "$name" --secret-string "$value" >/dev/null
 done
 ```
-
-> The secret named `tessera/anthropic-api-key` actually holds the Gemini API key — historical naming, see DESIGN.md *Limitations*.
 
 ### 4. Install cluster add-ons
 
@@ -250,6 +248,25 @@ kubectl -n temporal port-forward svc/tessera-temporal-web 8080:8080
 
 Concurrent test (proves session isolation): open two threads in different channels and mention the bot in both nearly-simultaneously. Two distinct workflow executions appear in the UI with different IDs and independent histories.
 
+### Verified end-to-end
+
+A representative successful run:
+
+```
+06:16:55  app_mention.received       (Slack thread 1777184214.432819)
+06:16:56  workflow.started           workflow_id=slack-T0AV…-C0B0…-1777184214.432819
+06:16:56  agent_activity.start
+06:16:56  POST api.anthropic.com → 200      ← Claude tool call #1 (list repo files)
+06:17:??  POST api.anthropic.com → 200      ← #2 (read existing files for context)
+06:17:??  POST api.anthropic.com → 200      ← #3 (write CONTRIBUTING.md)
+06:17:??  POST api.anthropic.com → 200      ← #4 (commit on per-thread branch)
+06:17:24  POST api.anthropic.com → 200      ← #5 (open PR)
+06:17:24  agent_activity.done        pr_url=https://github.com/.../pull/1
+06:17:25  slack_post.done            (PR link posted in the originating thread)
+```
+
+Total wall time from `@mention` to PR link: ~30 seconds for a 5-tool-call agent run.
+
 ---
 
 ## Cleanup
@@ -298,7 +315,9 @@ A few real issues hit during the build of this submission, captured here so they
 
 **Schema-init pod gets `pq: no pg_hba.conf entry … no encryption`.** RDS Postgres has `rds.force_ssl=1` by default. Fix: TLS enabled on both Temporal datastores in `helm/temporal/values.yaml` (`tls.enabled: true`, `enableHostVerification: false`).
 
-**`temporal-worker` crashes on startup with `ImportError: cannot import name 'claw_state' from beartype.claw._clawstate`.** Pydantic AI's transitive deps install `beartype.claw` as a process-wide import hook that conflicts with Temporal's workflow sandbox. Fix: `workflow_runner=UnsandboxedWorkflowRunner()` in the worker's `main.py` (already applied). Long-term fix is to switch to `pydantic-ai-slim[google]` — see DESIGN.md.
+**`temporal-worker` crashes on startup with `ImportError: cannot import name 'claw_state' from beartype.claw._clawstate`.** Pydantic AI's transitive deps install `beartype.claw` as a process-wide import hook that conflicts with Temporal's workflow sandbox. Fix: `workflow_runner=UnsandboxedWorkflowRunner()` in the worker's `main.py` (already applied). Long-term fix is to switch to `pydantic-ai-slim[anthropic]` — see DESIGN.md.
+
+**Workflow crashes with `'dict' object has no attribute 'error'` after the activity returns.** Two-part fix already applied: (1) both Temporal clients (bot + worker) use `temporalio.contrib.pydantic.pydantic_data_converter` so Pydantic models survive the activity boundary as models instead of being downgraded to dicts, and (2) the workflow passes `result_type=AgentResult` to `execute_activity` because Temporal cannot infer the return type from a string activity name.
 
 **`Error: count … cannot be determined until apply`** during `terraform plan` on the ESO IRSA module. Cause: passing a `data.aws_iam_policy_document.json` (whose value depends on resource ARNs unknown at plan time) into a module that uses it for `count`. Fix: a separate `create_inline_policy = true` boolean argument on the module so `count` reads from a literal known at plan time (already applied).
 

@@ -105,31 +105,39 @@ The alternative (long-lived workflow with `wait_condition` on a signal + idle ti
 
 `UnsandboxedWorkflowRunner` is used in `apps/temporal-worker/src/temporal_worker/main.py`. Pydantic AI's transitive deps (`beartype.claw` via `cyclopts`/`fastmcp`) install a process-wide import hook that triggers a circular import when Temporal's sandbox attempts a controlled re-import of the workflow module.
 
-The workflow is deterministic by construction — every I/O call lives in an activity, the workflow body is a pair of `execute_activity` calls and a return — so the sandbox's safety check provides no real protection here. The cleaner long-term fix is to switch to `pydantic-ai-slim[google]` and re-enable the sandbox; documented in *Future improvements*.
+The workflow is deterministic by construction — every I/O call lives in an activity, the workflow body is a pair of `execute_activity` calls and a return — so the sandbox's safety check provides no real protection here. The cleaner long-term fix is to switch to `pydantic-ai-slim[anthropic]` and re-enable the sandbox; documented in *Future improvements*.
 
-### 6. Secrets via External Secrets Operator + AWS Secrets Manager
+### 6. Pydantic-aware data converter on both Temporal clients
 
-Slack tokens, the LLM API key, and the GitHub PAT live in AWS Secrets Manager. The External Secrets Operator runs in-cluster with an IRSA role (`tessera-eso`) granting `secretsmanager:GetSecretValue` on the four `tessera/*` secrets and on the RDS-managed master user secret.
+Both the bot's and the worker's `Client.connect()` use `temporalio.contrib.pydantic.pydantic_data_converter`. Without it, the default JSON converter strips Pydantic models down to plain dicts as they cross the activity boundary, and the workflow's `result.error` access fails with `AttributeError`. Because Temporal can't infer return types from string-named activity invocations, the workflow also passes `result_type=AgentResult` to `execute_activity` — the data converter is necessary but not sufficient on its own.
+
+### 7. Anthropic Claude as the LLM provider
+
+The agent runs on `anthropic:claude-haiku-4-5-20251001` via Pydantic AI's `AnthropicProvider`. The choice was driven less by capability differences and more by reliability: free-tier Gemini is hard-capped at 0 RPD on the day-of-demo, which makes it unviable for a graded submission. Anthropic's pay-as-you-go pricing on Haiku 4.5 (~$0.05–0.15 per agent run) removes the rate-limit failure mode entirely. The model ID is set in `helm/temporal-worker/values.yaml` and threads through to the Pydantic AI agent via the `LLM_MODEL` env var; switching providers is a one-line change there plus a corresponding env var rename in the `ExternalSecret`.
+
+### 8. Secrets via External Secrets Operator + AWS Secrets Manager
+
+Slack tokens, the Anthropic API key, and the GitHub PAT live in AWS Secrets Manager. The External Secrets Operator runs in-cluster with an IRSA role (`tessera-eso`) granting `secretsmanager:GetSecretValue` on the four `tessera/*` secrets and on the RDS-managed master user secret.
 
 `ClusterSecretStore aws-secrets-manager` is created once with the helm/temporal install. The two app charts each declare a small `ExternalSecret` that pulls the keys it needs into a Kubernetes Secret with the same name as the deployment, which the pod consumes via `envFrom`. The pod template carries a `checksum/secret` annotation that forces a rollout when secret content changes.
 
 No secret value ever lives in git, in `helm template` output, or in container images. Terraform creates the Secrets Manager entries with placeholder values; the actual secrets are written out-of-band via the AWS console or `aws secretsmanager put-secret-value`.
 
-### 7. RDS Postgres for Temporal persistence (not the in-cluster default)
+### 9. RDS Postgres for Temporal persistence (not the in-cluster default)
 
 A managed RDS Postgres instance backs Temporal — multi-AZ off (cost), encrypted at rest (gp3 + AES256), `manage_master_user_password = true` so the credential lives in Secrets Manager and rotates without Terraform touching it. SSL is enforced on the client side (Temporal Helm values set `tls.enabled: true` for both the default and visibility datastores), satisfying RDS's `rds.force_ssl=1` parameter.
 
 Trade-off: provisioning is slower than an in-cluster StatefulSet. In return, the database survives node group rotation, takes EBS snapshots automatically, and lets Temporal scale node count without persistence migration.
 
-### 8. Three-tier subnet design (public / private / data)
+### 10. Three-tier subnet design (public / private / data)
 
 Public subnets (NAT gateways, future ALB), private subnets (EKS worker nodes), and data subnets (RDS only — no internet route). RDS lives in two data subnets across two AZs as required by AWS for any DB subnet group, even though the instance itself is single-AZ. The data subnets have no `0.0.0.0/0` route, so the database has no path to the internet — only intra-VPC reachability via the implicit `local` route. This was a deliberate design call to limit blast radius if the DB is ever compromised.
 
-### 9. CI/CD via GitHub Actions OIDC → ECR
+### 11. CI/CD via GitHub Actions OIDC → ECR
 
 A GitHub OIDC provider is registered in AWS IAM. An IAM role (`tessera-gha-ecr-push`) trusts the provider with a `repo:ugoasoluka/tessera:*` subject condition. The build workflow assumes the role with no static AWS credentials in GitHub secrets. Daily versioning via `fregante/daily-version-action`; ECR repos are `IMMUTABLE` so re-pushing the same tag is a hard error.
 
-### 10. Helm charts kept thin and identical in shape
+### 12. Helm charts kept thin and identical in shape
 
 Both app charts share the same skeleton: `Chart.yaml`, `values.yaml`, `_helpers.tpl`, `deployment.yaml`, `externalsecret.yaml`. No `Service` (both apps are outbound-only), no probes (no HTTP listener — restart-on-crash via container exit code is sufficient for these workloads), no `ServiceAccount` override (default SA is fine — neither pod talks to AWS APIs directly).
 
@@ -160,7 +168,8 @@ The assignment specifically calls out concurrent users with privacy and session 
 - **Workflow sandbox is disabled.** No automatic detection of accidental non-determinism in workflow code. Mitigated by keeping the workflow body trivially deterministic, but a future contributor could regress this.
 - **Single org-level GitHub PAT.** The PAT has write access to one sandbox repo. A real deployment would use per-user GitHub App OAuth so PRs are attributed to the requesting human, and so the platform never holds long-lived org-write credentials.
 - **No agent code execution sandbox.** The agent edits files via the GitHub API but never runs arbitrary shell commands or tests. If `bash` execution is added later, each invocation needs a per-task gVisor / Firecracker sandbox; currently we sidestep that whole class of risk by not having a code-execution tool at all.
-- **`pydantic-ai` (full) is installed instead of `pydantic-ai-slim[google]`.** The full distribution pulls every provider's SDK (anthropic, openai, cohere, mistralai, groq, xai-sdk, mcp, fastmcp, logfire, otel) and ~100 MB of unused dependencies. This is the root cause of decision #5.
+- **`pydantic-ai` (full) is installed instead of `pydantic-ai-slim[anthropic]`.** The full distribution pulls every provider's SDK (anthropic, openai, cohere, mistralai, groq, google-genai, xai-sdk, mcp, fastmcp, logfire, otel) and ~100 MB of unused dependencies. This is the root cause of decision #5 — `cyclopts`/`fastmcp` are the deps that install `beartype.claw` and conflict with Temporal's sandbox.
+- **String-named activity invocations require explicit `result_type=`.** `workflow.execute_activity("run_agent", ...)` cannot infer the return type from a string, so `result_type=AgentResult` must be passed. A typo here regresses to the dict-instead-of-model failure mode. A type-safe activity invocation (passing the activity function reference instead of its name) would catch this at type-check time but couples workflow and activity modules more tightly.
 - **No Prometheus / Grafana / Loki.** Observability stack is `kubectl logs` plus the Temporal Web UI. Workflows are still inspectable in the UI with full step history.
 - **No probes on app pods.** Both apps are outbound-only with no HTTP listener. Kubernetes restart-on-exit is the only liveness signal. A `/healthz` endpoint would be a small addition.
 - **No PodDisruptionBudget, no HPA.** Single-replica deployments — fine at this traffic, would need both for production rollouts.
@@ -174,7 +183,7 @@ The assignment specifically calls out concurrent users with privacy and session 
 
 In rough priority order if this work continued:
 
-1. **Switch to `pydantic-ai-slim[google]`** and re-enable Temporal's workflow sandbox. Drops image size by ~3× and restores deterministic-import enforcement.
+1. **Switch to `pydantic-ai-slim[anthropic]`** and re-enable Temporal's workflow sandbox. Drops image size by ~3× (the full distribution pulls every provider's SDK plus `mcp`/`fastmcp` and the OTel stack) and restores deterministic-import enforcement.
 2. **Move conversational state into a long-lived workflow.** Replace per-message workflow runs with `signal_with_start` + `wait_condition(signal_received or idle_timeout)` + `continue_as_new` past ~50 turns. Makes follow-up Slack messages share LLM context naturally.
 3. **Per-user GitHub App OAuth.** Replace the org-level PAT with a GitHub App; on first use, the bot DMs the user a link to grant repo access. PRs become attributable to humans.
 4. **Per-tool activities** for the agent's tool loop. Trades implementation complexity for mid-loop durability — the agent can survive worker pod death between LLM turns instead of restarting from the prompt.
