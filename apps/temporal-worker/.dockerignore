@@ -1,0 +1,10 @@
+.venv
+.python-version
+__pycache__
+*.pyc
+.pytest_cache
+.git
+.gitignore
+README.md
+Dockerfile
+.dockerignore

@@ -10,3 +10,9 @@ Slack receives a message, the bot starts a Temporal workflow, the workflow drive
 See [`DESIGN.md`](./DESIGN.md) for decisions, trade-offs, and future improvements.
 
 ## Repository layout
+
+kubectl exec -n temporal deployment/tessera-temporal-admintools -- \
+  temporal operator namespace create \
+    --namespace tessera \
+    --retention 7d \
+    --address tessera-temporal-frontend:7233
