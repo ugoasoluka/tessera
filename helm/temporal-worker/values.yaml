@@ -1,0 +1,45 @@
+image:
+  repository: 851276831101.dkr.ecr.us-east-2.amazonaws.com/tessera-temporal-worker
+  tag: v26.4.26
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+# Temporal connection (matches the in-cluster service)
+temporal:
+  address: tessera-temporal-frontend.temporal.svc.cluster.local:7233
+  namespace: tessera
+  taskQueue: tessera-coding-agent
+
+# GitHub repo the agent operates on
+github:
+  repo: ugoasoluka/tessera
+
+# LLM
+llm:
+  model: google-gla:gemini-2.0-flash
+
+# ESO ClusterSecretStore (created by helm/temporal/external-secret.yaml)
+externalSecrets:
+  storeRef:
+    kind: ClusterSecretStore
+    name: aws-secrets-manager
+  refreshInterval: 1h
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
