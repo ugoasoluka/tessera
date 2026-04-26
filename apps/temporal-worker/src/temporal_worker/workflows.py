@@ -34,9 +34,13 @@ class CodingAgentWorkflow:
             },
         )
 
+        # `result_type` is required when invoking activities by string name —
+        # Temporal can't infer the Pydantic model from a string, so without
+        # this the result comes back as a plain dict and `result.error` fails.
         agent_result: AgentResult = await workflow.execute_activity(
             "run_agent",
             input.prompt,
+            result_type=AgentResult,
             start_to_close_timeout=timedelta(minutes=10),
             heartbeat_timeout=timedelta(minutes=2),
             retry_policy=RetryPolicy(
