@@ -1,0 +1,80 @@
+name: Docker Image Build and Push
+
+on:
+  workflow_dispatch:
+    inputs:
+      apps:
+        description: "Which app(s) to build"
+        type: choice
+        default: all
+        options:
+          - all
+          - slack-bot
+          - temporal-worker
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ inputs.apps }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write    # daily-version-action tags the commit
+  id-token: write    # GitHub to AWS OIDC handshake
+
+env:
+  AWS_REGION: us-east-2
+  AWS_ROLE_ARN: arn:aws:iam::851276831101:role/tessera-gha-ecr-push
+  ECR_REPO_PREFIX: tessera
+
+jobs:
+  build:
+    name: build ${{ matrix.app }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ inputs.apps == 'all' && fromJSON('["slack-bot","temporal-worker"]') || fromJSON(format('["{0}"]', inputs.apps)) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # daily-version-action needs full git history
+
+      - name: Daily version
+        id: version
+        uses: fregante/daily-version-action@v2
+        with:
+          prefix: v
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-session-name: gha-build-${{ matrix.app }}-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/${{ matrix.app }}
+          file: apps/${{ matrix.app }}/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPO_PREFIX }}-${{ matrix.app }}:${{ steps.version.outputs.version }}
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,scope=${{ matrix.app }},mode=max
+          provenance: false
+          sbom: false
+
+      - name: Job summary
+        run: |
+          IMAGE="${{ steps.ecr.outputs.registry }}/${{ env.ECR_REPO_PREFIX }}-${{ matrix.app }}:${{ steps.version.outputs.version }}"
+          echo "### ${{ matrix.app }}: \`${{ steps.version.outputs.version }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Pushed \`${IMAGE}\`" >> "$GITHUB_STEP_SUMMARY"
