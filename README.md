@@ -1,3 +1,4 @@
+![Architecture](docs/architecture.png)
 # Tessera Coding Agent Platform
 
 A Slack-based coding assistant that orchestrates LLM-driven code changes through durable Temporal workflows on AWS EKS, opens GitHub pull requests, and posts the result back to the originating Slack thread. Built for the Tessera Labs take-home assignment.
