@@ -24,6 +24,9 @@ temporal:
               maxConns: 20
               maxIdleConns: 20
               maxConnLifetime: "1h"
+              tls:
+                enabled: true
+                enableHostVerification: false
 
           visibility:
             sql:
@@ -40,6 +43,9 @@ temporal:
               maxConns: 20
               maxIdleConns: 20
               maxConnLifetime: "1h"
+              tls:
+                enabled: true
+                enableHostVerification: false
 
     frontend:
       resources:
