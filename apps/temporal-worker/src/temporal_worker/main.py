@@ -7,7 +7,7 @@ import sys
 
 import structlog
 from temporalio.client import Client
-from temporalio.worker import Worker
+from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 from .activities import run_agent_activity, slack_post_thread_reply
 from .config import Config
@@ -49,11 +49,16 @@ async def _run() -> None:
         namespace=config.temporal_namespace,
     )
 
+    # Sandbox disabled because pydantic-ai's transitive deps (beartype.claw via
+    # cyclopts/fastmcp) hit a circular import when the sandbox re-imports modules.
+    # The workflow is deterministic by construction (all I/O is in activities),
+    # so the sandbox's safety check isn't needed here.
     worker = Worker(
         client,
         task_queue=config.temporal_task_queue,
         workflows=[CodingAgentWorkflow],
         activities=[run_agent_activity, slack_post_thread_reply],
+        workflow_runner=UnsandboxedWorkflowRunner(),
     )
 
     log.info("worker.started", task_queue=config.temporal_task_queue)
