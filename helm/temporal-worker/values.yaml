@@ -1,6 +1,6 @@
 image:
   repository: 851276831101.dkr.ecr.us-east-2.amazonaws.com/tessera-temporal-worker
-  tag: v26.4.26
+  tag: v26.4.26.511
   pullPolicy: IfNotPresent
 
 replicaCount: 1
