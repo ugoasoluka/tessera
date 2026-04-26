@@ -3,6 +3,7 @@ from __future__ import annotations
 import structlog
 from temporalio.client import Client
 from temporalio.common import WorkflowIDReusePolicy
+from temporalio.contrib.pydantic import pydantic_data_converter
 from .config import Config
 from .models import WorkflowInput, workflow_id_from_slack
 
@@ -23,9 +24,12 @@ class TemporalClient:
             address=config.temporal_address,
             namespace=config.temporal_namespace,
         )
+        # Must match the worker's data converter — both ends serialize
+        # WorkflowInput / AgentResult through the same Pydantic-aware codec.
         client = await Client.connect(
             config.temporal_address,
             namespace=config.temporal_namespace,
+            data_converter=pydantic_data_converter,
         )
         log.info("temporal.connected")
         return cls(client=client, config=config)

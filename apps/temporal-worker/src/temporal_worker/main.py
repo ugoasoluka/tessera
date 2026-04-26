@@ -7,6 +7,7 @@ import sys
 
 import structlog
 from temporalio.client import Client
+from temporalio.contrib.pydantic import pydantic_data_converter
 from temporalio.worker import UnsandboxedWorkflowRunner, Worker
 
 from .activities import run_agent_activity, slack_post_thread_reply
@@ -44,9 +45,13 @@ async def _run() -> None:
         task_queue=config.temporal_task_queue,
     )
 
+    # Use the Pydantic-aware data converter so AgentResult / WorkflowInput
+    # round-trip as Pydantic models across the activity boundary instead of
+    # being downgraded to plain dicts by the default JSON converter.
     client = await Client.connect(
         config.temporal_address,
         namespace=config.temporal_namespace,
+        data_converter=pydantic_data_converter,
     )
 
     # Sandbox disabled because pydantic-ai's transitive deps (beartype.claw via
