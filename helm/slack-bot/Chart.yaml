@@ -3,4 +3,4 @@ name: tessera-slack-bot
 description: Tessera coding agent Slack bot (Socket Mode handler)
 type: application
 version: 0.1.0
-appVersion: "0.1.0"
+appVersion: "v26.4.26"
