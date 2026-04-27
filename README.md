@@ -19,7 +19,10 @@ Workflow state persists in RDS Postgres (in a dedicated data subnet). Applicatio
 ├── DESIGN.md                   # decisions, trade-offs, limitations, future work
 ├── README.md                   # this file
 ├── docs/
-│   └── architecture.png
+│   ├── architecture.png
+│   ├── slack-agent-thread.png             # evidence: bot replying with PR links
+│   ├── temporal-concurrent-workflows.png  # evidence: per-thread session isolation
+│   └── github-agent-prs.png               # evidence: PRs opened by the agent
 ├── apps/
 │   ├── slack-bot/              # Bolt + Socket Mode -> Temporal client
 │   └── temporal-worker/        # Pydantic AI agent + Temporal worker
