@@ -193,7 +193,7 @@ data:
 ```yaml
 image:
   repository: <ECR_REGISTRY>/tessera-slack-bot      # or tessera-temporal-worker
-  tag: <set-in-step-5>
+  tag: <set-in-step-7>
 ```
 
 **`helm/temporal-worker/values.yaml`** — also set the GitHub repo the agent will operate on:
@@ -308,7 +308,7 @@ Note the tag — you'll set it in the Helm values in the next step.
 
 ### 7. Install the app charts
 
-Now that the images are in ECR, set the `image.tag` in both app charts' `values.yaml` to whatever CI just pushed (e.g. `v26.4.26`). The image repository was already set in step 3, so this is the last edit before deploying:
+Now that the images are in ECR, set the `image.tag` in both app charts' `values.yaml` to whatever CI just pushed (e.g. `v26.4.26`). The image repository was already set in step 4, so this is the last edit before deploying:
 
 ```yaml
 # helm/slack-bot/values.yaml AND helm/temporal-worker/values.yaml
