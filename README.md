@@ -86,7 +86,7 @@ terraform apply        # answer "yes" at the prompt
 cd ../..
 ```
 
-You should see roughly 3 resources created: an S3 bucket (versioned, encrypted), a DynamoDB lock table, and a bucket policy.
+You should see 5 resources created: an S3 bucket with versioning, server-side encryption, and public-access blocking, plus a DynamoDB lock table.
 
 ### 2. Apply the main infrastructure
 
@@ -391,6 +391,20 @@ A representative successful run from the build:
 ```
 
 Wall time from `@mention` to PR link: ~30 seconds for a 5-tool-call agent run.
+
+#### Evidence
+
+The bot in action — `@Coding Agent` mentions in a Slack channel, with the bot acknowledging and posting back PR links once each run completes:
+
+![Slack thread with the agent replying](docs/slack-agent-thread.png)
+
+The Temporal Web UI showing four distinct concurrent workflow executions, all `CodingAgentWorkflow`, each with a workflow ID derived from a different Slack thread. Same `team_id`, same `channel_id`, different `thread_ts` — proof of per-thread session isolation:
+
+![Temporal UI showing four concurrent workflow executions](docs/temporal-concurrent-workflows.png)
+
+The GitHub side — two pull requests on `ugoasoluka/tessera`, both opened by the agent on per-workflow branches:
+
+![GitHub PRs opened by the agent](docs/github-agent-prs.png)
 
 ---
 
