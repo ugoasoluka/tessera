@@ -99,11 +99,11 @@ terraform apply  # answer "yes" at the prompt
 cd ../..
 ```
 
-Capture two outputs you will need shortly:
+Capture the GitHub Actions role ARN — you'll paste it into the workflow file in step 6:
 
 ```bash
 terraform -chdir=terraform/main output github_actions_role_arn
-# → arn:aws:iam::<acct>:role/tessera-gha-ecr-push   (paste into the GHA workflow)
+# → arn:aws:iam::<acct>:role/tessera-gha-ecr-push
 ```
 
 Wire `kubectl` to the new cluster:
@@ -404,11 +404,13 @@ helm uninstall tessera-slack-bot       -n tessera-apps
 helm uninstall tessera-temporal-worker -n tessera-apps
 kubectl delete namespace tessera-apps
 
-# 2. Cluster add-ons
-kubectl delete -f helm/temporal/external-secret.yaml
+# 2. Cluster add-ons. Uninstall Helm releases BEFORE deleting the namespace
+#    manifest — Helm 3 stores release state as a Secret in the release's
+#    namespace, so deleting the namespace first orphans the release.
 helm uninstall tessera-temporal         -n temporal
 helm uninstall tessera-external-secrets -n external-secrets
-kubectl delete namespace temporal external-secrets
+kubectl delete -f helm/temporal/external-secret.yaml --ignore-not-found
+kubectl delete namespace temporal external-secrets --ignore-not-found
 
 # 3. ECR images (the repos have IMMUTABLE tags; force_delete=true on the
 #    Terraform side handles destroying repos that still contain images,
